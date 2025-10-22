@@ -36,7 +36,7 @@
  * Lvalue strings must outlive the SaferStringView.
  *
  * @warning Cannot detect temporaries passed via string_view:
- *          SaferStringView(std::string_view(std::string("temp"))) // Dangling!
+ *          SaferStringView(std::string_view(std::to_string(2025))) // Dangling!
  */
 template <typename T>
   requires requires { typename std::char_traits<T>; }
