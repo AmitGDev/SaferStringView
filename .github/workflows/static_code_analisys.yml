@@ -1,0 +1,132 @@
+name: "Static Code Analysis (x64 Debug & Release C++23)"
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: ["*"]
+  schedule:
+    - cron: '0 6 * * 0'  # Every Sunday at 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.config }})
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false  # Changed to false to see results from both configs
+      matrix:
+        config: ['Debug', 'Release']
+
+    steps:
+      # 1. Checkout the repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Install LLVM (clang-tidy) BEFORE CodeQL
+      - name: Install LLVM (clang-tidy)
+        run: |
+          choco install llvm --version=20.1.8 -y
+          echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          clang-tidy --version
+
+      # 3. Initialize CodeQL
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: cpp
+
+      # 4. Set up MSBuild (VS2022)
+      - name: Set up MSBuild (VS2022)
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '17.0'
+
+      # 5. Build the solution (matrix handles Debug/Release)
+      - name: Build project (${{ matrix.config }}, x64, C++23)
+        shell: cmd
+        run: |
+          echo Activating Developer Command Prompt...
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+
+          echo Building solution (${{ matrix.config }}, x64) with C++23 standard...
+          msbuild /m ^
+            /p:Configuration=${{ matrix.config }} ^
+            /p:Platform=x64 ^
+            /p:LanguageStandard=stdcpplatest ^
+            SaferStringView.sln
+
+      # 6. Run clang-tidy using .clang-tidy config
+      - name: Run clang-tidy
+        shell: pwsh
+        continue-on-error: true  # Don't fail the build, but report issues
+        run: |
+          Write-Host "Running clang-tidy on source files with .clang-tidy config..."
+
+          # Show the actual config clang-tidy is using
+          Write-Host "`nclang-tidy configuration being used:"
+          clang-tidy --dump-config
+
+          # Define preprocessor symbols based on configuration (matching MSBuild defaults)
+          $defines = "-DWIN32", "-D_WINDOWS"
+          if ("${{ matrix.config }}" -eq "Debug") {
+            $defines += "-D_DEBUG"
+          } else {
+            $defines += "-DNDEBUG"
+          }
+
+          Write-Host "Using defines: $($defines -join ' ')"
+
+          # Find all .cpp and .h files
+          $files = Get-ChildItem -Path . -Include *.cpp,*.h -Recurse | Where-Object { $_.FullName -notmatch '\\build\\|\\bin\\|\\obj\\' }
+
+          $issueCount = 0
+          foreach ($file in $files) {
+            Write-Host "Checking $($file.FullName)"
+
+            # Determine language mode (treat .h as C++ headers)
+            $langFlag = if ($file.Extension -eq ".h") { "-x", "c++-header" } else { @() }
+
+            # Run clang-tidy using .clang-tidy file.
+            $output = clang-tidy $file.FullName `
+              -- `
+              $langFlag `
+              -std=c++23 `
+              -I"$PWD" `
+              $defines `
+              2>&1
+
+            # Check if clang-tidy found issues
+            if ($LASTEXITCODE -ne 0) {
+              $issueCount++
+              Write-Host "Issues found in $($file.Name)" -ForegroundColor Yellow
+              Write-Host $output
+            }
+          }
+
+          Write-Host "`nclang-tidy completed. Files with issues: $issueCount" -ForegroundColor $(if ($issueCount -gt 0) { "Yellow" } else { "Green" })
+
+          # Always exit successfully so the workflow continues
+          exit 0
+
+      # 7. Perform CodeQL Analysis
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:cpp/config:${{ matrix.config }}"
+
+      # 8. Upload build artifacts for debugging
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ matrix.config }}
+          path: |
+            **/*.log
+            msbuild.log
+          retention-days: 7
