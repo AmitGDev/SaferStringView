@@ -1,5 +1,7 @@
-#ifndef AMITG_FC_SAFERSTRINGVIEW
-#define AMITG_FC_SAFERSTRINGVIEW
+// NOLINTBEGIN(llvm-header-guard)
+#ifndef AMITG_SAFERSTRINGVIEW_HPP_
+#define AMITG_SAFERSTRINGVIEW_HPP_
+// NOLINTEND(llvm-header-guard)
 
 /*
     SaferStringView.hpp
@@ -51,20 +53,24 @@ class SaferStringView final {
       : storage_(std::move(str)) {}
 
   // Non-owning: from string_view
-  explicit SaferStringView(std::basic_string_view<T> sv) : storage_(sv) {}
+  explicit SaferStringView(std::basic_string_view<T> view) : storage_(view) {}
 
   // Non-owning: from const char* (common use case)
   explicit SaferStringView(const T *str)
       : storage_(std::basic_string_view<T>(str)) {}
 
+  // C++23: Deducing this for implicit conversion operator
   // Implicit conversion for drop-in string_view replacement
-  operator std::basic_string_view<T>() const {
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions)
+  constexpr operator std::basic_string_view<T>(
+      this const SaferStringView &self) {
     return std::visit(
-        [](const auto &s) -> std::basic_string_view<T> { return s; }, storage_);
+        [](const auto &val) -> std::basic_string_view<T> { return val; },
+        self.storage_);
   }
 
  private:
-#ifdef _TEST
+#ifdef TEST_SAFERSTRINGVIEW
  public:
 #endif
   std::variant<std::basic_string<T>, std::basic_string_view<T>> storage_;
