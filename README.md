@@ -1,5 +1,12 @@
 # SaferStringView v2.0.0
-A Safe String View Wrapper for C++20 applications (Header-Only Class)
+
+<br>
+
+⚠️ Note: This release requires C++23. If you need C++20 compatibility, see version 1.0.0 [here](https://github.com/AmitGDev/SaferStringView/tree/version-1).
+
+<br>
+
+A Safe String View Wrapper for C++23 applications (Header-Only Class)
 
 **Author:** Amit Gefen  
 **License:** MIT License
@@ -10,6 +17,7 @@ A Safe String View Wrapper for C++20 applications (Header-Only Class)
 * Drop-in replacement for `std::string_view` with implicit conversion support.
 * Leverages C++20 concepts for type safety.
 * Zero-overhead abstraction using `std::variant` for storage.
+* **C++23 Enhanced:** Uses explicit object parameters (deducing `this`) for cleaner syntax and `constexpr` conversion operators.
 
 ## Features
 * **Automatic Lifetime Management:**
@@ -29,6 +37,9 @@ A Safe String View Wrapper for C++20 applications (Header-Only Class)
 * **Memory Efficient:**
    * Only stores owned strings when necessary (rvalue temporaries).
    * Views existing strings without copying when safe.
+* **Modern C++23 Syntax:**
+   * Uses explicit object parameters (deducing `this`) for improved clarity.
+   * `constexpr` conversion operator enables compile-time string operations.
 
 ## Usage
 - Include the header file:
@@ -88,5 +99,5 @@ std::cout << std::string_view(ssv);  // Works correctly!
 * **Testing:** Compile with `#define _TEST` to enable test-specific features for verifying ownership.
 
 ## Dependencies
-* C++20 compiler with concepts support
+* C++23 compiler with concepts support
 * Standard Library (no external dependencies)
