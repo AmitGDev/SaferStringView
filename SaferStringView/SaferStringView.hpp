@@ -46,18 +46,19 @@ class SaferStringView final {
  public:
   // Non-owning: from lvalue string reference (stores view)
   explicit SaferStringView(const std::basic_string<T> &str)
-      : storage_(std::basic_string_view<T>(str)) {}
+      : storage_(std::basic_string_view<T>(str)), null_terminated_(true) {}
 
   // Owning: from rvalue string (stores owned string)
   explicit SaferStringView(std::basic_string<T> &&str)
-      : storage_(std::move(str)) {}
+      : storage_(std::move(str)), null_terminated_(true) {}
 
   // Non-owning: from string_view
-  explicit SaferStringView(std::basic_string_view<T> view) : storage_(view) {}
+  explicit SaferStringView(std::basic_string_view<T> view)
+      : storage_(view), null_terminated_(false) {}
 
   // Non-owning: from const char* (common use case)
   explicit SaferStringView(const T *str)
-      : storage_(std::basic_string_view<T>(str)) {}
+      : storage_(std::basic_string_view<T>(str)), null_terminated_(true) {}
 
   // C++23: Deducing this for implicit conversion operator
   // Implicit conversion for drop-in string_view replacement
@@ -69,11 +70,17 @@ class SaferStringView final {
         self.storage_);
   }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  [[nodiscard]] bool null_terminated() const noexcept {
+    return null_terminated_;
+  }
+
  private:
 #ifdef TEST_SAFERSTRINGVIEW
  public:
 #endif
   std::variant<std::basic_string<T>, std::basic_string_view<T>> storage_;
+  bool null_terminated_;
 };
 
 #endif
